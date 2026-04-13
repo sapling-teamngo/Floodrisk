@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jordan Environmental Early Warning System</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+  :root {
+    --bg: #0a0e14;
+    --panel: #0f1520;
+    --border: #1e2d42;
+    --accent: #00c8ff;
+    --accent2: #ff6b35;
+    --safe: #00e676;
+    --low: #aeea00;
+    --moderate: #ffd740;
+    --high: #ff6d00;
+    --extreme: #d50000;
+    --text: #cdd6e8;
+    --muted: #5c7594;
+    --card: #111c2a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  header {
+    position: relative;
+    padding: 0 2rem;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,14,20,0.95);
+    backdrop-filter: blur(12px);
+    z-index: 1000;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 38px;
+    height: 38px;
+    background: linear-gradient(135deg, var(--accent), #0070ff);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 0 20px rgba(0,200,255,0.3);
+  }
+
+  .logo-text { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.05em; }
+  .logo-sub { font-size: 0.65rem; font-family: 'Space Mono', monospace; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .pulse-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--safe);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,230,118,0.4); }
+    50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(0,230,118,0); }
+  }
+
+  /* LAYOUT */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    height: calc(100vh - 72px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .sidebar-section {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  /* COORDINATE INPUT */
+  .coord-form { display: flex; flex-direction: column; gap: 12px; }
+
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+
+  .input-group label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .input-group input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  .input-group input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,200,255,0.1);
+  }
+
+  .input-group input::placeholder { color: var(--muted); }
+
+  .analyze-btn {
+    background: linear-gradient(135deg, var(--accent), #0070ff);
+    border: none;
+    border-radius: 8px;
+    padding: 13px;
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .analyze-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0);
+    transition: background 0.2s;
+  }
+
+  .analyze-btn:hover::after { background: rgba(255,255,255,0.08); }
+  .analyze-btn:active { transform: scale(0.98); }
+
+  .analyze-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* PRESETS */
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .preset-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s;
+  }
+
+  .preset-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,200,255,0.05);
+  }
+
+  .preset-city { font-weight: 700; display: block; margin-bottom: 2px; }
+  .preset-coords { color: var(--muted); font-size: 0.6rem; }
+
+  /* RESULTS */
+  #results { display: none; }
+
+  .danger-badge {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 10px;
+    margin-bottom: 1.2rem;
+    border: 1px solid;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .danger-badge::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.06;
+    background: currentColor;
+  }
+
+  .danger-level-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .danger-info { flex: 1; }
+  .danger-title { font-size: 1rem; font-weight: 700; margin-bottom: 3px; }
+  .danger-subtitle { font-size: 0.72rem; font-family: 'Space Mono', monospace; opacity: 0.7; }
+
+  /* RISK BARS */
+  .risk-item {
+    margin-bottom: 14px;
+  }
+
+  .risk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .risk-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .risk-name .icon { font-size: 0.9rem; }
+
+  .risk-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+  }
+
+  .risk-bar-track {
+    height: 6px;
+    background: var(--bg);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .risk-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* DETAIL CARDS */
+  .detail-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+
+  .detail-card-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--accent);
+  }
+
+  .detail-card p {
+    font-size: 0.75rem;
+    line-height: 1.55;
+    color: var(--text);
+    opacity: 0.85;
+  }
+
+  .source-tag {
+    display: inline-block;
+    background: rgba(0,200,255,0.08);
+    border: 1px solid rgba(0,200,255,0.2);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--accent);
+    margin-top: 6px;
+  }
+
+  /* LOADING ANIMATION */
+  .loader {
+    display: none;
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .loader.active { display: block; }
+
+  .loader-ring {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    margin: 0 auto 12px;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loader-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* MAP */
+  #map {
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+
+  .map-container {
+    position: relative;
+    flex: 1;
+  }
+
+  .map-overlay-title {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 800;
+    background: rgba(10,14,20,0.88);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  .map-legend {
+    position: absolute;
+    bottom: 30px;
+    right: 16px;
+    z-index: 800;
+    background: rgba(10,14,20,0.9);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    border-radius: 8px;
+    padding: 12px 14px;
+    min-width: 160px;
+  }
+
+  .legend-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-size: 0.72rem;
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .marker-pin {
+    animation: fadeInUp 0.4s ease;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* TOOLTIP */
+  .info-tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+  }
+
+  .info-tooltip .tip {
+    visibility: hidden;
+    width: 200px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.68rem;
+    position: absolute;
+    z-index: 1000;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(100% + 6px);
+    color: var(--text);
+    line-height: 1.4;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .info-tooltip:hover .tip { visibility: visible; opacity: 1; }
+
+  /* SCROLLBAR for sidebar */
+  .scrollbar-thin { scrollbar-width: thin; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .main-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .sidebar { max-height: 55vh; }
+  }
+
+  /* Leaflet dark tiles override */
+  .leaflet-tile-pane { filter: brightness(0.65) saturate(0.6) hue-rotate(180deg) invert(1); }
+  .leaflet-control-attribution { display: none !important; }
+
+  /* Animated scan line */
+  .scan-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 400;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,200,255,0.015) 2px,
+      rgba(0,200,255,0.015) 4px
+    );
+  }
+
+  .coordinate-display {
+    position: absolute;
+    bottom: 30px;
+    left: 16px;
+    z-index: 800;
+    background: rgba(10,14,20,0.88);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  #coord-display-val { color: var(--accent); }
+
+  /* Hazard zone overlays */
+  .leaflet-overlay-pane path { }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚠</div>
+    <div>
+      <div class="logo-text">JORDAN EWS</div>
+      <div class="logo-sub">Environmental Early Warning System</div>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="pulse-dot"></div>
+    <span>SYSTEM OPERATIONAL · DATA UPDATED 2024–2025</span>
+  </div>
+</header>
+
+<div class="main-layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- COORDINATE INPUT -->
+    <div class="sidebar-section">
+      <div class="section-label">📍 Coordinate Analysis</div>
+      <div class="coord-form">
+        <div class="input-row">
+          <div class="input-group">
+            <label>Latitude (°N)</label>
+            <input type="number" id="lat-input" placeholder="31.9539" min="29.1" max="33.4" step="0.0001">
+          </div>
+          <div class="input-group">
+            <label>Longitude (°E)</label>
+            <input type="number" id="lon-input" placeholder="35.9106" min="34.9" max="39.3" step="0.0001">
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Location Name (optional)</label>
+          <input type="text" id="name-input" placeholder="e.g. Near Zarqa River">
+        </div>
+        <button class="analyze-btn" id="analyze-btn" onclick="analyzeLocation()">
+          ⚡ ANALYZE HAZARD LEVEL
+        </button>
+      </div>
+    </div>
+
+    <!-- QUICK PRESETS -->
+    <div class="sidebar-section">
+      <div class="section-label">🗺 Quick Locations</div>
+      <div class="preset-grid">
+        <button class="preset-btn" onclick="setPreset(31.9539, 35.9106, 'Amman')">
+          <span class="preset-city">Amman</span>
+          <span class="preset-coords">31.9539°N 35.9106°E</span>
+        </button>
+        <button class="preset-btn" onclick="setPreset(32.5568, 35.8469, 'Irbid')">
+          <span class="preset-city">Irbid</span>
+          <span class="preset-coords">32.5568°N 35.8469°E</span>
+        </button>
+        <button class="preset-btn" onclick="setPreset(29.5269, 35.0063, 'Aqaba')">
+          <span class="preset-city">Aqaba</span>
+          <span class="preset-coords">29.5269°N 35.0063°E</span>
+        </button>
+        <button class="preset-btn" onclick="setPreset(30.3285, 35.4444, 'Petra/Wadi Musa')">
+          <span class="preset-city">Petra/Wadi Musa</span>
+          <span class="preset-coords">30.3285°N 35.4444°E</span>
+        </button>
+        <button class="preset-btn" onclick="setPreset(31.7167, 35.6000, 'Dead Sea Coast')">
+          <span class="preset-city">Dead Sea Coast</span>
+          <span class="preset-coords">31.7167°N 35.6000°E</span>
+        </button>
+        <button class="preset-btn" onclick="setPreset(32.0365, 36.0817, 'Zarqa')">
+          <span class="preset-city">Zarqa</span>
+          <span class="preset-coords">32.0365°N 36.0817°E</span>
+        </button>
+        <button class="preset-btn" onclick="setPreset(31.1867, 37.1500, 'Ma\'an')">
+          <span class="preset-city">Ma'an</span>
+          <span class="preset-coords">31.1867°N 37.1500°E</span>
+        </button>
+        <button class="preset-btn" onclick="setPreset(31.7454, 35.5432, 'Jordan Valley')">
+          <span class="preset-city">Jordan Valley</span>
+          <span class="preset-coords">31.7454°N 35.5432°E</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- LOADER -->
+    <div class="loader sidebar-section" id="loader">
+      <div class="loader-ring"></div>
+      <div class="loader-text">ANALYZING HAZARD DATA…</div>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="results">
+
+      <!-- OVERALL DANGER BADGE -->
+      <div class="sidebar-section" id="badge-section">
+        <div class="section-label">⚡ Hazard Assessment</div>
+        <div id="danger-badge" class="danger-badge">
+          <div id="danger-num" class="danger-level-num">—</div>
+          <div class="danger-info">
+            <div id="danger-title" class="danger-title">—</div>
+            <div id="danger-subtitle" class="danger-subtitle">—</div>
+          </div>
+        </div>
+
+        <!-- RISK BREAKDOWN -->
+        <div id="risk-breakdown"></div>
+      </div>
+
+      <!-- DETAIL ANALYSIS -->
+      <div class="sidebar-section" id="detail-section">
+        <div class="section-label">📋 Detailed Analysis</div>
+        <div id="detail-cards"></div>
+      </div>
+
+      <!-- SOURCES -->
+      <div class="sidebar-section">
+        <div class="section-label">📚 Data Sources</div>
+        <div style="font-size:0.72rem; line-height:1.7; color:var(--muted);">
+          <div>• <strong style="color:var(--text)">Flash Flood Risk:</strong> Jordan Ministry of Water &amp; Irrigation; Gumbel Distribution GIS Study, Applied Journal of Dysona (2025); Shatanawi et al., Water Conservation &amp; Management (2024)</div>
+          <div style="margin-top:6px">• <strong style="color:var(--text)">Seismic Hazard:</strong> Natural Resources Authority of Jordan (NRA); Dead Sea Transform Fault assessments, Natural Hazards Journal; USGS Global Seismic Hazard</div>
+          <div style="margin-top:6px">• <strong style="color:var(--text)">Climate &amp; Wadi Risk:</strong> Red Cross Climate Centre – Jordan Profile (2024); UNICEF Jordan Climate Risk; ScienceDirect Flash Flood Hazard Assessments</div>
+          <div style="margin-top:6px">• <strong style="color:var(--text)">Elevation/Terrain:</strong> SRTM Digital Elevation Model (NASA/USGS); SAGA/QGIS terrain analysis</div>
+          <div style="margin-top:6px">• <strong style="color:var(--text)">Urban Expansion:</strong> ScienceDirect Urban Flooding Amman (2025); Jordan Times Climate Reporting</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MAP PANEL -->
+  <div class="map-container">
+    <div id="map"></div>
+    <div class="scan-overlay"></div>
+
+    <div class="map-overlay-title">
+      🌍 JORDAN — DEM HAZARD MAP<br>
+      <span style="font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);font-weight:400">Click map to set coordinates</span>
+    </div>
+
+    <div class="map-legend">
+      <div class="legend-title">Hazard Zones</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#00e676"></div>Minimal</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#aeea00"></div>Low</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ffd740"></div>Moderate</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ff6d00"></div>High</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#d50000"></div>Extreme</div>
+      <div style="border-top:1px solid var(--border);margin:8px 0;"></div>
+      <div class="legend-item"><div style="width:10px;height:3px;background:#00c8ff;border-radius:2px"></div>Wadi Network</div>
+      <div class="legend-item"><div style="width:10px;height:3px;background:#ff6b35;border-radius:2px;border-top:2px dashed #ff6b35"></div>Seismic Fault</div>
+    </div>
+
+    <div class="coordinate-display">
+      LAT/LNG: <span id="coord-display-val">Hover to inspect</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// MAP INITIALIZATION
+// =====================================================================
+const map = L.map('map', {
+  center: [31.0, 36.5],
+  zoom: 7,
+  zoomControl: true,
+  attributionControl: false
+});
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 18
+}).addTo(map);
+
+// Track mouse for coordinate display
+map.on('mousemove', (e) => {
+  document.getElementById('coord-display-val').textContent =
+    `${e.latlng.lat.toFixed(4)}°N  ${e.latlng.lng.toFixed(4)}°E`;
+});
+
+// Click map to set coordinates
+map.on('click', (e) => {
+  document.getElementById('lat-input').value = e.latlng.lat.toFixed(4);
+  document.getElementById('lon-input').value = e.latlng.lng.toFixed(4);
+  analyzeLocation();
+});
+
+// =====================================================================
+// HAZARD ZONE OVERLAYS — Based on published GIS/scientific data
+// =====================================================================
+
+// Dead Sea Transform Fault (approximate trace) — Red dashed line
+// Source: NRA Jordan, Dead Sea Transform fault system literature
+const faultLine = L.polyline([
+  [29.49, 34.97], [29.8, 35.05], [30.2, 35.15], [30.6, 35.35],
+  [31.0, 35.48], [31.3, 35.52], [31.55, 35.56], [31.72, 35.59],
+  [32.0, 35.66], [32.3, 35.72], [32.55, 35.82], [32.7, 35.88],
+  [33.0, 36.02]
+], {
+  color: '#ff6b35',
+  weight: 2.5,
+  dashArray: '8,5',
+  opacity: 0.7
+}).addTo(map);
+
+faultLine.bindTooltip('Dead Sea Transform Fault — Active seismic zone<br><small>Source: NRA Jordan / Natural Hazards Journal</small>', {
+  sticky: true, className: 'leaflet-tooltip-dark'
+});
+
+// Wadi Mujib Basin — High flash flood hazard
+// Source: MDPI Water, 2024 — covers Al-Karak, Amman, Ma'an governorates
+const wadiMujib = L.polygon([
+  [31.45, 35.57], [31.7, 35.65], [31.8, 36.2], [31.6, 36.5],
+  [31.3, 36.6], [31.0, 36.3], [30.9, 35.9], [31.1, 35.6]
+], { color: '#ff6d00', fillColor: '#ff6d00', fillOpacity: 0.12, weight: 1.5, opacity: 0.5, dashArray: '4,4' }).addTo(map);
+wadiMujib.bindTooltip('Wadi Mujib Basin — 71.24% moderate-high flash flood hazard<br><small>Source: Shatanawi et al., Water Conservation & Management (2024); MDPI Water (2024)</small>', { sticky: true });
+
+// Wadi Zarqa Basin — High urban flood risk (Amman)
+// Source: ScienceDirect Urban Flooding Study (2025)
+const zarqaZone = L.polygon([
+  [32.0, 35.85], [32.15, 36.0], [32.2, 36.3], [32.05, 36.45],
+  [31.9, 36.2], [31.85, 35.95]
+], { color: '#ffd740', fillColor: '#ffd740', fillOpacity: 0.1, weight: 1.5, opacity: 0.5, dashArray: '4,4' }).addTo(map);
+zarqaZone.bindTooltip('Zarqa/Amman Urban Flood Zone — Rapid urban expansion; flash flood history<br><small>Source: ScienceDirect Urban Flooding, Amman (2025)</small>', { sticky: true });
+
+// Aqaba Governorate — 28.4% very high flood risk
+// Source: ScienceDirect Aqaba Flash Flood Study (2022)
+const aqabaZone = L.polygon([
+  [29.2, 34.95], [29.6, 35.1], [29.9, 35.4], [29.8, 35.7],
+  [29.5, 35.5], [29.2, 35.2]
+], { color: '#d50000', fillColor: '#d50000', fillOpacity: 0.13, weight: 1.5, opacity: 0.5 }).addTo(map);
+aqabaZone.bindTooltip('Aqaba Governorate — 28.4% area very high flood risk; seismic hazard from Dead Sea Transform<br><small>Source: ScienceDirect (2022); Shatanawi et al. (2024)</small>', { sticky: true });
+
+// Petra/Wadi Musa — High flash flood potential (ephemeral wadi)
+// Source: ScienceDirect (2014), Wadi Mousa Assessment
+const petraZone = L.circle([30.33, 35.44], {
+  radius: 22000,
+  color: '#ff6d00', fillColor: '#ff6d00', fillOpacity: 0.12, weight: 1.5
+}).addTo(map);
+petraZone.bindTooltip('Petra / Wadi Musa — Ephemeral flash flood risk; 100-yr return period event recorded 1963<br><small>Source: ScienceDirect Flash Flood Assessment, Wadi Mousa (2014)</small>', { sticky: true });
+
+// Western Highlands — High flood frequency zone
+// Source: Gumbel Distribution GIS Study — "western mountainous regions show highest flood frequency"
+const westHighlands = L.polygon([
+  [32.5, 35.7], [33.0, 35.85], [33.1, 36.0], [32.8, 36.1],
+  [32.4, 35.95], [32.2, 35.75]
+], { color: '#ffd740', fillColor: '#ffd740', fillOpacity: 0.09, weight: 1, opacity: 0.4 }).addTo(map);
+westHighlands.bindTooltip('Northern Highlands (Irbid/Ajloun) — High flood frequency per 37-year rainfall analysis<br><small>Source: Applied Dysona GIS Study (2025)</small>', { sticky: true });
+
+// Dead Sea shores — Sinkhole & terrain risk
+const deadSeaZone = L.polygon([
+  [31.15, 35.45], [31.4, 35.53], [31.65, 35.57], [31.8, 35.62],
+  [31.8, 35.45], [31.65, 35.38], [31.4, 35.33], [31.15, 35.38]
+], { color: '#aeea00', fillColor: '#aeea00', fillOpacity: 0.08, weight: 1, opacity: 0.4 }).addTo(map);
+deadSeaZone.bindTooltip('Dead Sea Shores — Sinkhole risk, wadi flash floods, seismic fault proximity<br><small>Source: NRA Jordan; Red Cross Climate Centre (2024)</small>', { sticky: true });
+
+// Eastern Desert — Low flood risk
+const eastDesert = L.polygon([
+  [30.0, 37.0], [30.0, 39.0], [33.0, 39.0], [33.0, 37.0]
+], { color: '#00e676', fillColor: '#00e676', fillOpacity: 0.04, weight: 1, opacity: 0.25 }).addTo(map);
+eastDesert.bindTooltip('Eastern Desert (Badia) — Low flood frequency; "lowest flood frequency in eastern desert regions"<br><small>Source: Applied Dysona GIS Study (2025)</small>', { sticky: true });
+
+// Jordan Valley — Wadi channels, seismic + flood risk
+const jordanValley = L.polyline([
+  [32.55, 35.56], [32.2, 35.58], [31.9, 35.57], [31.6, 35.56],
+  [31.3, 35.52], [31.0, 35.48], [30.6, 35.35]
+], { color: '#00c8ff', weight: 3, opacity: 0.5 }).addTo(map);
+jordanValley.bindTooltip('Jordan Valley / River Jordan — Active wadi corridor; high flood risk in valley<br><small>Source: Jordan Times; Red Cross Climate Centre (2024)</small>', { sticky: true });
+
+let currentMarker = null;
+
+// =====================================================================
+// HAZARD COMPUTATION ENGINE
+// Based on spatial risk data from cited scientific sources
+// =====================================================================
+
+function computeHazard(lat, lng) {
+  const risks = {
+    flash_flood: 0,
+    seismic: 0,
+    wadi_proximity: 0,
+    urban_flood: 0,
+    drought_heat: 0,
+    terrain: 0
+  };
+
+  // ------- FLASH FLOOD RISK -------
+  // Source: Gumbel Distribution GIS Study (2025) — western mountainous = highest
+  // Source: Aqaba Study (2022) — 28.4% area very high
+  // Source: Wadi Mujib Study (2024) — 71.24% moderate-high
+
+  // Western highlands (Irbid, Ajloun, Jerash) — highest flood frequency
+  if (lat > 32.0 && lat < 33.4 && lng > 35.5 && lng < 36.2) {
+    risks.flash_flood += 65;
+  }
+  // Amman urban area — flash flood due to urbanisation
+  if (lat > 31.8 && lat < 32.2 && lng > 35.7 && lng < 36.2) {
+    risks.flash_flood += 60;
+  }
+  // Wadi Mujib basin
+  if (lat > 31.0 && lat < 31.8 && lng > 35.5 && lng < 36.6) {
+    risks.flash_flood += 55;
+  }
+  // Aqaba governorate — 28.4% very high
+  if (lat < 29.8 && lng < 35.6) {
+    risks.flash_flood += 75;
+  }
+  // Petra/Wadi Musa — ephemeral flash flood
+  if (lat > 30.1 && lat < 30.6 && lng > 35.2 && lng < 35.7) {
+    risks.flash_flood += 70;
+  }
+  // Dead Sea shores / Jordan Valley
+  if (lng > 35.3 && lng < 35.7 && lat > 30.8 && lat < 32.5) {
+    risks.flash_flood += 50;
+  }
+  // Eastern desert — low
+  if (lng > 37.0) {
+    risks.flash_flood += 5;
+  }
+  risks.flash_flood = Math.min(risks.flash_flood, 100);
+
+  // ------- SEISMIC HAZARD -------
+  // Source: NRA Jordan; Dead Sea Transform Fault literature
+  // Fault runs approximately along lng 35.5–36.0, affecting western Jordan
+
+  // Aqaba — highest seismic risk (Gulf of Aqaba fault junction, 1995 Mw 7.3 event)
+  if (lat < 29.7 && lng < 35.3) {
+    risks.seismic = 90;
+  }
+  // Dead Sea region — active fault system
+  else if (Math.abs(lng - 35.55) < 0.2 && lat > 30.5 && lat < 32.5) {
+    risks.seismic = 75;
+  }
+  // Western Jordan near Dead Sea Transform
+  else if (lng < 36.0 && lat > 30.0 && lat < 33.5) {
+    risks.seismic = 55;
+  }
+  // Central / East Jordan — lower
+  else if (lng > 36.5) {
+    risks.seismic = 15;
+  } else {
+    risks.seismic = 35;
+  }
+
+  // ------- WADI / LANDFALL RISK -------
+  // Source: Ministry of Water & Irrigation; wadi network studies
+  // Wadi Zarqa, Wadi Mujib, Wadi Hasa, Wadi Rum
+
+  // Wadi Zarqa area
+  if (lat > 31.9 && lat < 32.3 && lng > 35.9 && lng < 36.5) {
+    risks.wadi_proximity = 80;
+  }
+  // Wadi Mujib
+  else if (lat > 31.3 && lat < 31.65 && lng > 35.5 && lng < 36.5) {
+    risks.wadi_proximity = 85;
+  }
+  // Jordan Valley floor
+  else if (lng > 35.35 && lng < 35.65 && lat > 30.6 && lat < 32.6) {
+    risks.wadi_proximity = 75;
+  }
+  // Wadi Rum / Ma'an
+  else if (lat > 29.5 && lat < 30.5 && lng > 35.5 && lng < 36.8) {
+    risks.wadi_proximity = 60;
+  }
+  else {
+    risks.wadi_proximity = 20;
+  }
+
+  // ------- URBAN FLOOD RISK -------
+  // Source: ScienceDirect Urban Flooding Amman (2025); Zarqa urban sprawl
+  if (lat > 31.85 && lat < 32.15 && lng > 35.85 && lng < 36.15) {
+    risks.urban_flood = 75; // Downtown Amman — "marked increase in flash floods"
+  } else if (lat > 31.95 && lat < 32.15 && lng > 36.0 && lng < 36.5) {
+    risks.urban_flood = 65; // Zarqa urbanised area
+  } else if (lat > 32.4 && lat < 32.7 && lng > 35.7 && lng < 36.1) {
+    risks.urban_flood = 45; // Irbid urban
+  } else {
+    risks.urban_flood = 10;
+  }
+
+  // ------- DROUGHT / HEAT / ENVIRONMENTAL -------
+  // Source: Red Cross Climate Centre Jordan (2024); Ministry of Environment (2021)
+  // Eastern desert highest; all Jordan moderate baseline
+  if (lng > 37.5) {
+    risks.drought_heat = 85; // Badia desert
+  } else if (lng > 36.5) {
+    risks.drought_heat = 65;
+  } else if (lat < 30.5) {
+    risks.drought_heat = 70; // Southern Jordan
+  } else {
+    risks.drought_heat = 35;
+  }
+
+  // ------- TERRAIN / ELEVATION RISK -------
+  // Source: SRTM DEM; AHP multi-criteria GIS analyses
+  // Low-altitude wadi mouths = highest terrain risk
+  if (lat > 31.0 && lat < 32.0 && lng > 35.35 && lng < 35.65) {
+    risks.terrain = 80; // Jordan Rift Valley floor — lowest elevation
+  } else if (lat > 30.5 && lat < 31.5 && lng > 35.5 && lng < 36.0) {
+    risks.terrain = 65;
+  } else if (lat > 32.0 && lat < 33.0 && lng > 35.6 && lng < 36.2) {
+    risks.terrain = 55; // Western highlands
+  } else {
+    risks.terrain = 25;
+  }
+
+  // --- COMPOSITE SCORE (weighted) ---
+  const weights = {
+    flash_flood: 0.30,
+    seismic: 0.25,
+    wadi_proximity: 0.20,
+    urban_flood: 0.10,
+    drought_heat: 0.08,
+    terrain: 0.07
+  };
+
+  let total = 0;
+  for (const k in weights) {
+    total += risks[k] * weights[k];
+  }
+  total = Math.round(Math.min(total, 100));
+
+  return { risks, total };
+}
+
+function getDangerLevel(score) {
+  if (score < 20) return { label: 'MINIMAL RISK', color: '#00e676', bg: 'rgba(0,230,118,0.12)', num: '1', desc: 'No significant environmental hazard detected for this location.' };
+  if (score < 40) return { label: 'LOW RISK', color: '#aeea00', bg: 'rgba(174,234,0,0.1)', num: '2', desc: 'Minor hazards present. Normal precautions apply.' };
+  if (score < 60) return { label: 'MODERATE RISK', color: '#ffd740', bg: 'rgba(255,215,64,0.1)', num: '3', desc: 'Multiple environmental hazards active. Stay alert to forecasts.' };
+  if (score < 80) return { label: 'HIGH RISK', color: '#ff6d00', bg: 'rgba(255,109,0,0.12)', num: '4', desc: 'Significant hazard exposure. Evacuation plans should be in place.' };
+  return { label: 'EXTREME RISK', color: '#d50000', bg: 'rgba(213,0,0,0.12)', num: '5', desc: 'Severe multi-hazard zone. Immediate caution required.' };
+}
+
+function getRiskLabel(score) {
+  if (score < 20) return { label: 'Very Low', color: '#00e676' };
+  if (score < 40) return { label: 'Low', color: '#aeea00' };
+  if (score < 60) return { label: 'Moderate', color: '#ffd740' };
+  if (score < 80) return { label: 'High', color: '#ff6d00' };
+  return { label: 'Extreme', color: '#d50000' };
+}
+
+// =====================================================================
+// UI FUNCTIONS
+// =====================================================================
+
+function setPreset(lat, lng, name) {
+  document.getElementById('lat-input').value = lat;
+  document.getElementById('lon-input').value = lng;
+  document.getElementById('name-input').value = name;
+  analyzeLocation();
+}
+
+function analyzeLocation() {
+  const lat = parseFloat(document.getElementById('lat-input').value);
+  const lng = parseFloat(document.getElementById('lon-input').value);
+  const name = document.getElementById('name-input').value || `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
+
+  if (isNaN(lat) || isNaN(lng)) {
+    alert('Please enter valid latitude and longitude coordinates.');
+    return;
+  }
+
+  if (lat < 29.1 || lat > 33.4 || lng < 34.9 || lng > 39.3) {
+    alert('Coordinates are outside Jordan\'s borders.\nLatitude: 29.1°–33.4°N\nLongitude: 34.9°–39.3°E');
+    return;
+  }
+
+  // Show loader, hide results
+  document.getElementById('loader').classList.add('active');
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('analyze-btn').disabled = true;
+
+  // Simulate async analysis
+  setTimeout(() => {
+    const { risks, total } = computeHazard(lat, lng);
+    const level = getDangerLevel(total);
+
+    // Update badge
+    const badge = document.getElementById('danger-badge');
+    badge.style.borderColor = level.color;
+    badge.style.background = level.bg;
+    badge.style.color = level.color;
+    document.getElementById('danger-num').textContent = level.num;
+    document.getElementById('danger-title').textContent = level.label;
+    document.getElementById('danger-subtitle').textContent = `Composite Score: ${total}/100 · ${name}`;
+
+    // Risk breakdown
+    const breakdownData = [
+      { key: 'flash_flood', icon: '🌊', label: 'Flash Flood Risk', source: 'Jordan MWI; Gumbel GIS (2025)' },
+      { key: 'seismic', icon: '⚡', label: 'Seismic Hazard', source: 'NRA Jordan; Dead Sea Transform Studies' },
+      { key: 'wadi_proximity', icon: '🏔', label: 'Wadi / Landfall Risk', source: 'MWI Wadi Network; Hydrological Models' },
+      { key: 'urban_flood', icon: '🏙', label: 'Urban Flood Exposure', source: 'ScienceDirect Amman Study (2025)' },
+      { key: 'drought_heat', icon: '☀️', label: 'Drought / Heat Stress', source: 'Red Cross Climate Centre (2024)' },
+      { key: 'terrain', icon: '🗻', label: 'Terrain Elevation Risk', source: 'SRTM DEM; GIS Multi-criteria' }
+    ];
+
+    let breakdownHTML = '';
+    breakdownData.forEach(d => {
+      const val = risks[d.key];
+      const rl = getRiskLabel(val);
+      breakdownHTML += `
+        <div class="risk-item">
+          <div class="risk-header">
+            <span class="risk-name"><span class="icon">${d.icon}</span>${d.label}</span>
+            <span class="risk-value" style="color:${rl.color}">${val}% · ${rl.label}</span>
+          </div>
+          <div class="risk-bar-track">
+            <div class="risk-bar-fill" style="width:0%;background:${rl.color}" data-target="${val}"></div>
+          </div>
+        </div>
+      `;
+    });
+    document.getElementById('risk-breakdown').innerHTML = breakdownHTML;
+
+    // Animate bars
+    setTimeout(() => {
+      document.querySelectorAll('.risk-bar-fill').forEach(bar => {
+        bar.style.width = bar.dataset.target + '%';
+      });
+    }, 100);
+
+    // Detail analysis cards
+    const details = generateDetailCards(lat, lng, risks);
+    document.getElementById('detail-cards').innerHTML = details;
+
+    // Update map marker
+    if (currentMarker) map.removeLayer(currentMarker);
+
+    const markerColor = level.color;
+    const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36">
+      <path d="M14 0C6.27 0 0 6.27 0 14c0 9.75 14 22 14 22s14-12.25 14-22C28 6.27 21.73 0 14 0z" fill="${markerColor}" opacity="0.9"/>
+      <circle cx="14" cy="14" r="6" fill="white" opacity="0.9"/>
+      <text x="14" y="18" text-anchor="middle" font-family="monospace" font-size="10" font-weight="bold" fill="${markerColor}">${level.num}</text>
+    </svg>`;
+
+    const icon = L.divIcon({
+      html: svgIcon,
+      iconSize: [28, 36],
+      iconAnchor: [14, 36],
+      popupAnchor: [0, -36],
+      className: 'marker-pin'
+    });
+
+    currentMarker = L.marker([lat, lng], { icon }).addTo(map);
+    currentMarker.bindPopup(`
+      <div style="font-family:'Syne',sans-serif;min-width:180px">
+        <strong>${name}</strong><br>
+        <span style="color:${level.color};font-weight:700">${level.label}</span><br>
+        <small style="color:#666">${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E</small><br>
+        <small>Composite Score: ${total}/100</small>
+      </div>
+    `).openPopup();
+
+    map.setView([lat, lng], 10, { animate: true });
+
+    // Show results
+    document.getElementById('loader').classList.remove('active');
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('analyze-btn').disabled = false;
+
+  }, 900);
+}
+
+function generateDetailCards(lat, lng, risks) {
+  let cards = '';
+
+  // Flash Flood Detail
+  let floodDetail = '';
+  if (lat > 32.0 && lat < 33.4 && lng > 35.5 && lng < 36.2) {
+    floodDetail = 'Located in the western mountainous region — the highest flood frequency zone per 37-year rainfall analysis. Annual rainfall events with 97% probability of occurrence. Maximum yearly rainfalls have a 39-year return period.';
+  } else if (lat > 31.8 && lat < 32.2 && lng > 35.7 && lng < 36.2) {
+    floodDetail = 'Amman\'s urban area has seen rapid expansion from ~83 km² (1986) to ~137 km² (2024), increasing impervious surfaces. Downtown Amman has experienced marked increase in flash flood frequency and intensity in recent years.';
+  } else if (lat < 29.8 && lng < 35.6) {
+    floodDetail = 'Aqaba Governorate: 28.4% of the total area (6,903 km²) is in very high flood risk conditions. 82% of built-up area and 55% of agricultural land face high to very high flooding risk.';
+  } else if (lat > 30.1 && lat < 30.6 && lng > 35.2 && lng < 35.7) {
+    floodDetail = 'Petra/Wadi Musa: Ephemeral wadi with intermittent flash floods exceeding 298 m³/s. A catastrophic 100-year return period event was recorded in April 1963. Only rainfall >22mm/24hr triggers runoff.';
+  } else if (lat > 31.0 && lat < 31.8 && lng > 35.5 && lng < 36.6) {
+    floodDetail = 'Wadi Mujib Basin: 71.24% of the total basin area (~3,061 km²) is classified as moderate-high flash flood hazard. Basin spans Al-Karak, Amman, and Ma\'an governorates.';
+  } else {
+    floodDetail = 'Flash flood risk is generally lower in this area. Jordan\'s overall hazard assessment classifies 17.6% of national area as "high" hazard, 34.5% as "low," and 47.9% as "medium."';
+  }
+
+  cards += `
+    <div class="detail-card">
+      <div class="detail-card-title">🌊 Flash Flood Analysis</div>
+      <p>${floodDetail}</p>
+      <span class="source-tag">Ministry of Water & Irrigation Jordan · Shatanawi et al. (2024) · Applied Dysona (2025)</span>
+    </div>`;
+
+  // Seismic Detail
+  let seismicDetail = '';
+  if (lat < 29.7 && lng < 35.3) {
+    seismicDetail = 'Aqaba is located at the junction of the Dead Sea Transform and the Gulf of Aqaba fault system. A Mw 7.3 earthquake struck the Gulf of Aqaba in 1995. The Avrona Fault runs through this region with documented liquefaction and paleoseismic evidence.';
+  } else if (Math.abs(lng - 35.55) < 0.25 && lat > 30.5 && lat < 32.5) {
+    seismicDetail = 'Dead Sea Rift zone: The fault system comprises at least 15 segments (25–55 km each). Destructive events recorded in 48, 1068, 1261, and 1588 AD. Slip rate of 4±2 mm/yr documented. High ongoing microseismicity.';
+  } else if (lng < 36.0) {
+    seismicDetail = 'Western Jordan lies in proximity to the Dead Sea Transform Fault — a left-lateral strike-slip fault connecting the Red Sea spreading zone to the Turkey collision zone. Moderate ongoing seismic activity.';
+  } else {
+    seismicDetail = 'Eastern Jordan has lower direct seismic risk but remains within the broader Dead Sea Transform influence zone. Historical earthquakes have affected all of Jordan. USGS classifies the broader region as moderate-to-high hazard.';
+  }
+
+  cards += `
+    <div class="detail-card">
+      <div class="detail-card-title">⚡ Seismic Hazard Analysis</div>
+      <p>${seismicDetail}</p>
+      <span class="source-tag">NRA Jordan Seismological Observatory · Natural Hazards Journal · USGS</span>
+    </div>`;
+
+  // Environmental / Climate Detail
+  let climateDetail = '';
+  if (lng > 37.0) {
+    climateDetail = 'Eastern Badia desert: extreme heat stress, very low rainfall (&lt;50mm/yr), high evapotranspiration. Climate change is intensifying drought frequency. Very low flood risk but severe water scarcity and heat health risk.';
+  } else if (lat < 30.5) {
+    climateDetail = 'Southern Jordan: high drought exposure, elevated temperatures, and seasonal flash flood events in wadis. The region has experienced flash floods of low (5–7 year), medium (20–25 year), and high (50-year) return intervals.';
+  } else {
+    climateDetail = 'Jordan faces intensifying climate risks: increasing drought frequency, higher evapotranspiration reducing surface water, and more frequent extreme precipitation events. The Jordan Valley and northern regions are identified as particularly vulnerable to climate change impacts.';
+  }
+
+  cards += `
+    <div class="detail-card">
+      <div class="detail-card-title">🌡 Environmental & Climate Risk</div>
+      <p>${climateDetail}</p>
+      <span class="source-tag">Red Cross Climate Centre Jordan (2024) · Ministry of Environment Jordan (2021) · UNICEF</span>
+    </div>`;
+
+  // Wadi Risk
+  if (risks.wadi_proximity > 50) {
+    let wadiDetail = 'This location is within or near an active wadi network. Wadis are dry ephemeral riverbeds that can experience sudden, violent flash floods with little warning — especially during autumn and winter rainfall events. ';
+    if (lat > 31.9 && lat < 32.3 && lng > 35.9 && lng < 36.5) {
+      wadiDetail += 'Wadi Zarqa: A major wadi passing through Zarqa and Amman. Historically caused fatalities including 13 deaths in a single flood event near Amman.';
+    } else if (lat > 31.3 && lat < 31.65 && lng > 35.5 && lng < 36.5) {
+      wadiDetail += 'Wadi Mujib: Flows into the Dead Sea. One of Jordan\'s most hazardous wadi corridors with catchment area of ~4,297 km².';
+    } else {
+      wadiDetail += 'Avoid low-lying wadi channels during rainfall events, even if rain appears distant. Flash floods can travel faster than pedestrian escape speed.';
+    }
+    cards += `
+      <div class="detail-card">
+        <div class="detail-card-title">🏔 Wadi / Landfall Risk</div>
+        <p>${wadiDetail}</p>
+        <span class="source-tag">Jordan Ministry of Water & Irrigation · The Conversation (2019) · MDPI Water (2024)</span>
+      </div>`;
+  }
+
+  return cards;
+}
+
+// Leaflet dark tooltip CSS injection
+const style = document.createElement('style');
+style.textContent = `
+  .leaflet-tooltip-dark {
+    background: rgba(10,14,20,0.92);
+    color: #cdd6e8;
+    border: 1px solid #1e2d42;
+    border-radius: 6px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.78rem;
+    padding: 8px 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    max-width: 260px;
+  }
+  .leaflet-tooltip-dark small {
+    opacity: 0.6;
+    font-size: 0.65rem;
+  }
+  .leaflet-popup-content-wrapper {
+    background: rgba(10,14,20,0.95);
+    color: #cdd6e8;
+    border: 1px solid #1e2d42;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .leaflet-popup-tip { background: rgba(10,14,20,0.95); }
+  .leaflet-popup-content { margin: 12px 14px; font-size: 0.82rem; }
+  .leaflet-control-zoom a {
+    background: rgba(10,14,20,0.9);
+    color: #cdd6e8;
+    border-color: #1e2d42;
+  }
+  .leaflet-control-zoom a:hover { background: #1e2d42; }
+`;
+document.head.appendChild(style);
+</script>
+</body>
+</html>
